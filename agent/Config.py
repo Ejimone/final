@@ -22,12 +22,13 @@ class Config:
     # Model selection 
     TRANSCRIPTION_MODEL = 'deepgram'  # I am thinking og using theses oga eme ka everthing diri anyi easy for maintenance and values: openai, groq, deepgram, fastwhisperapi
     RESPONSE_MODEL = 'groq'  # Changed from 'groq' to 'openai' since we're using OpenAI as fallback
-    TTS_MODEL = 'cartesia'  # I am thinking og using theses oga eme ka everthing diri anyi easy for maintenance and values: openai, deepgram, elevenlabs, melotts, cartesia
+    TTS_MODEL = 'deepgram'  # I am thinking og using theses oga eme ka everthing diri anyi easy for maintenance and values: openai, deepgram, elevenlabs, melotts, cartesia
 
     # Model names for each provider
     OPENAI_STT_MODEL = "whisper-1"
     GROQ_STT_MODEL = "whisper-large-v3"
     DEEPGRAM_STT_MODEL = "nova-2"
+    ELEVENLABS_STT_MODEL = "eleven_flash_v2"
 
     # LLM Selection
     OLLAMA_LLM = "llama2:13b"  # Updated to a more stable model
@@ -55,6 +56,7 @@ class Config:
     MAX_RETRIES = 3
     RETRY_DELAY = 1  # seconds
     
+    
     # Content safety thresholds for Gemini
     SAFETY_SETTINGS = [
         {
@@ -74,6 +76,23 @@ class Config:
             "threshold": "BLOCK_MEDIUM_AND_ABOVE"
         }
     ]
+
+    # Search settings
+    SEARCH_TIMEOUT = 30  # seconds
+    SEARCH_MAX_RESULTS = 5
+    SEARCH_PROVIDERS = ["serpapi", "brave", "ddg"]  # Order of preference
+    
+    # Cache settings
+    CACHE_TTL = 300  # 5 minutes for real-time data
+    CACHE_SIZE = 1000
+    
+    # Real-time sources
+    REALTIME_SOURCES = {
+        "news": ["news-api", "rss-feeds"],
+        "weather": ["openweathermap", "weatherapi"],
+        "stocks": ["alpha-vantage", "yahoo-finance"],
+        "sports": ["sports-api", "espn"],
+    }
 
     @staticmethod
     def validate_config():

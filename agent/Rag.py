@@ -12,6 +12,7 @@ from urllib.parse import quote_plus
 import time
 from tenacity import retry, stop_after_attempt, wait_exponential
 
+
 # Langchain imports
 from langchain_openai import OpenAI, OpenAIEmbeddings
 from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI

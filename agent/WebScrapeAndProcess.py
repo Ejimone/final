@@ -265,10 +265,11 @@ Please try again with a different search query.
 
 
 
-async def _test_scrape_webpages_with_serpapi():
+async def scraped_data():
     query = input("what do you want to search for? ")
     result = await scrape_webpages_with_serpapi(query)
-    print(result)
+    print(result)  # Optionally keep for debugging
+    return result
 
 if __name__ == "__main__":
-    asyncio.run(_test_scrape_webpages_with_serpapi())
+    asyncio.run(scraped_data())

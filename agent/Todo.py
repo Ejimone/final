@@ -43,6 +43,7 @@ class PathConfig:
     BASE_DIR = Path(__file__).parent
     CREDENTIALS_PATH = BASE_DIR / 'credentials.json'
     TOKEN_PATH = BASE_DIR / 'token.json'
+    
 
 @dataclass
 class TodoItem:

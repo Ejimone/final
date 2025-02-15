@@ -33,160 +33,201 @@ class InvalidLocationError(WeatherServiceError):
     """Exception for invalid location input"""
     pass
 
-class ApiConnectionError(WeatherServiceError):
-    """Exception for API connection issues"""
-    pass
-
 class WeatherService:
-    """Weather service with caching and error handling"""
-    def __init__(self):
-        self.api_key = os.getenv("OPENWEATHERMAP_API_KEY")
+    """Production-grade weather data service"""
+    
+    def __init__(self, config: WeatherConfig = WeatherConfig()):
+        self.config = config
+        self.api_key = os.getenv("OPENWEATHER_API_KEY")
         if not self.api_key:
-            logger.error("OpenWeatherMap API key not found in environment variables")
-            raise ValueError("OpenWeatherMap API key not found in environment variables")
-        logger.debug(f"Using OpenWeatherMap API key: {self.api_key}")  # Debug log for API key
-        self.base_url = "http://api.openweathermap.org/data/2.5/weather"
-        self._session = None
+            raise WeatherServiceError("OPENWEATHER_API_KEY not found in environment variables")
+        self.session = None
+        self._validate_config()
 
-    async def get_session(self) -> aiohttp.ClientSession:
-        """Get or create aiohttp session"""
-        if self._session is None or self._session.closed:
-            self._session = aiohttp.ClientSession()
-        return self._session
+    async def _ensure_session(self) -> None:
+        """Ensure aiohttp session is created"""
+        if self.session is None or self.session.closed:
+            self.session = aiohttp.ClientSession()
 
-    async def close(self):
-        """Close the session properly"""
-        if self._session and not self._session.closed:
-            await self._session.close()
-            self._session = None
+    def _validate_config(self) -> None:
+        """Validate service configuration"""
+        if not self.api_key:
+            raise WeatherServiceError("OPENWEATHER_API_KEY not configured")
+        if len(self.api_key) != 32:
+            raise WeatherServiceError("Invalid API key format")
 
+    async def close(self) -> None:
+        """Clean up resources"""
+        await self.session.close()
+
+    def _validate_location(self, location: str) -> None:
+        """Validate location input"""
+        if not location or len(location) > self.config.MAX_LOCATION_LENGTH:
+            raise InvalidLocationError("Invalid location format")
+        if re.search(r"[^a-zA-Z0-9\s,.-]", location):
+            raise InvalidLocationError("Location contains invalid characters")
+
+    @retry(
+        stop=stop_after_attempt(WeatherConfig.MAX_RETRIES),
+        wait=wait_exponential(multiplier=1, min=2, max=10)
+    )
     async def get_weather(self, location: str) -> Dict[str, Any]:
-        """Get weather data with caching and enhanced error handling"""
-        if not location or not isinstance(location, str):
-            print("\n⚠️ Error: Invalid location provided")
-            return {
-                "status": "error",
-                "message": "Invalid location provided"
-            }
-            
+        """Get current weather data with comprehensive error handling"""
         try:
-            session = await self.get_session()
+            await self._ensure_session()  # Ensure session is available
+            self._validate_location(location)
             params = {
                 "q": location,
                 "appid": self.api_key,
                 "units": "metric"
             }
-
-            async with session.get(self.base_url, params=params) as response:
+            
+            async with self.session.get(
+                self.config.API_BASE_URL,
+                params=params,
+                timeout=self.config.REQUEST_TIMEOUT
+            ) as response:
+                response_data = await response.json()
+                
                 if response.status == 200:
-                    data = await response.json()
-                    weather_data = self._parse_weather_data(data, location)
-                    return {
-                        "status": "success",
-                        "data": weather_data,
-                        "source": "OpenWeatherMap"
-                    }
-                elif response.status == 401:
-                    error_msg = "Weather service authentication failed"
-                    print(f"\n⚠️ Error: {error_msg}")
+                    return self._format_response(response_data)
+                elif response.status == 404:
                     return {
                         "status": "error",
-                        "message": error_msg
+                        "message": "Location not found"
                     }
                 else:
-                    error_msg = f"Weather service error: {response.status}"
-                    print(f"\n⚠️ Error: {error_msg}")
+                    logger.error("API Error: %s", response_data.get('message', 'Unknown error'))
                     return {
                         "status": "error",
-                        "message": error_msg
+                        "message": f"Weather service error: {response_data.get('message', 'Unknown error')}"
                     }
 
         except aiohttp.ClientError as e:
-            error_msg = f"Network error: {str(e)}"
-            print(f"\n⚠️ Error: {error_msg}")
+            logger.error("Network error: %s", str(e))
             return {
                 "status": "error",
-                "message": error_msg
+                "message": "Service temporarily unavailable"
+            }
+        except json.JSONDecodeError as e:
+            logger.error("Invalid API response: %s", str(e))
+            return {
+                "status": "error",
+                "message": "Invalid service response"
             }
         except Exception as e:
-            error_msg = f"Unexpected error: {str(e)}"
-            print(f"\n⚠️ Error: {error_msg}")
+            logger.error("Unexpected error: %s", str(e))
             return {
                 "status": "error",
-                "message": error_msg
+                "message": f"Unexpected error: {str(e)}"
             }
 
-    def _parse_weather_data(self, data: Dict[str, Any], location: str) -> Dict[str, Any]:
-        """Parse weather API response into standardized format"""
-        return {
-            "location": location,
-            "temperature": round(data["main"]["temp"], 1),
-            "feels_like": round(data["main"]["feels_like"], 1),
-            "humidity": data["main"]["humidity"],
-            "wind_speed": round(data["wind"]["speed"], 1),
-            "conditions": data["weather"][0]["description"].capitalize(),
-            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        }
-
-async def get_weather(location: str) -> Dict[str, Any]:
-    """Get weather for a location using WeatherService"""
-    weather_service = None
-    try:
-        weather_service = WeatherService()
-        result = await weather_service.get_weather(location)
-        return result
-    except Exception as e:
-        logger.error("Weather lookup error", exc_info=True)
-        return {
-            "status": "error",
-            "message": f"Unexpected error: {str(e)}"
-        }
-    finally:
-        if weather_service:
-            await weather_service.close()
-
-async def interactive_weather_lookup():
-    """Interactive weather lookup with enhanced error handling"""
-    print("\n" + "=" * 40)
-    print("============ Weather Lookup ============")
-    print("=" * 40 + "\n")
-
-    try:
-        location = input("Enter location (city, country code): ").strip()
-        if not location:
-            print("⚠️ Location cannot be empty")
-            return None
-
-        service = WeatherService()
+    def _format_response(self, data: Dict) -> Dict[str, Any]:
+        """Format API response into standardized format"""
         try:
-            result = await service.get_weather(location)
+            # Convert timezone offset (in seconds) to hours
+            timezone_offset = data.get('timezone', 0)  # Default to UTC if not provided
+            tz = datetime.now(pytz.UTC).astimezone(pytz.FixedOffset(timezone_offset // 60))
             
-            if result["status"] == "success":
-                weather = result["data"]
-                print(f"\n🌍 Current Weather in {weather['location']}")
-                print(f"🕒 {weather['timestamp']}")
-                print(f"🌡️ Temperature: {weather['temperature']}°C")
-                print(f"🌡️ Feels like: {weather['feels_like']}°C")
-                print(f"💧 Humidity: {weather['humidity']}%")
-                print(f"🌪️ Wind Speed: {weather['wind_speed']} m/s")
-                print(f"☁️ Conditions: {weather['conditions']}")
-            else:
-                print(f"\n⚠️ {result['message']}")
-                
+            return {
+                "status": "success",
+                "data": {
+                    "location": f"{data['name']}, {data.get('sys', {}).get('country', '')}",
+                    "temperature": data['main']['temp'],
+                    "feels_like": data['main']['feels_like'],
+                    "humidity": data['main']['humidity'],
+                    "wind_speed": data['wind']['speed'],
+                    "conditions": data['weather'][0]['description'].capitalize(),
+                    "timestamp": tz.strftime('%Y-%m-%d %H:%M:%S %Z'),
+                    "raw_data": data
+                },
+                "type": "weather"
+            }
+        except KeyError as e:
+            logger.error("Missing data in API response: %s", str(e))
+            return {
+                "status": "error",
+                "message": "Incomplete weather data"
+            }
         except Exception as e:
-            print(f"\n⚠️ Unexpected error: {str(e)}")
-            logger.error("Interactive lookup error", exc_info=True)
-        finally:
-            await service.close()
+            logger.error("Error formatting response: %s", str(e))
+            return {
+                "status": "error",
+                "message": "Error processing weather data"
+            }
 
-    except KeyboardInterrupt:
-        print("\n\nWeather lookup cancelled by user")
-    except Exception as e:
-        print(f"\n⚠️ Error: {str(e)}")
-        logger.error("Weather lookup error", exc_info=True)
+async def current_get_weather(service: WeatherService) -> None:
+    """Interactive weather lookup interface"""
+    print("\n" + "="*40)
+    print(" Weather Lookup ".center(40, "="))
+    print("="*40 + "\n")
+    
+    try:
+        while True:
+            try:
+                location = input("Enter location (city, country code): ").strip()
+                if not location:
+                    print("⚠️ Location cannot be empty")
+                    continue
+                    
+                result = await service.get_weather(location)
+                
+                if result.get("status") == "success":
+                    weather = result["data"]
+                    print(f"\n🌍 Current Weather in {weather['location']}")
+                    print(f"🕒 {weather['timestamp']}")
+                    print(f"🌡️ Temperature: {weather['temperature']}°C")
+                    print(f"🌡️ Feels like: {weather['feels_like']}°C")
+                    print(f"💧 Humidity: {weather['humidity']}%")
+                    print(f"🌪️ Wind Speed: {weather['wind_speed']} m/s")
+                    print(f"☁️ Conditions: {weather['conditions']}")
+                else:
+                    print(f"\n⚠️ {result.get('message', 'Could not retrieve weather data')}")
+                
+                choice = input("\nCheck another location? (y/N): ").lower()
+                if choice != 'y':
+                    break
+                    
+            except InvalidLocationError as e:
+                print(f"⚠️ Error: {str(e)}")
+            except WeatherServiceError as e:
+                print(f"⚠️ Service error: {str(e)}")
+            except Exception as e:
+                print(f"⚠️ Unexpected error: {str(e)}")
+                logger.exception("Interactive lookup error")
+                break  # Break on unexpected errors
     finally:
         print("\nThank you for using Weather Lookup!")
 
+# Example usage
+async def get_weather():
+    service = None
+    try:
+        # Debug: Print API key (remove in production)
+        api_key = os.getenv("OPENWEATHER_API_KEY")
+        print(f"API Key found: {bool(api_key)}")
+        
+        service = WeatherService()
+        await current_get_weather(service)
+    except WeatherServiceError as e:
+        print(f"⚠️ Service initialization failed: {str(e)}")
+    except Exception as e:
+        print(f"⚠️ Unexpected error: {str(e)}")
+    finally:
+        if service and service.session:
+            await service.close()
+            
+async def get_weather_data(location: str) -> Dict:
+    service = WeatherService()
+    try:
+        return await service.get_weather(location)
+    finally:
+        await service.close()
 if __name__ == "__main__":
     import asyncio
-    asyncio.run(interactive_weather_lookup())
+    asyncio.run(get_weather())
+
+
+"""
+for integration with other services:
+"""
