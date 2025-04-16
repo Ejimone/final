@@ -6,10 +6,13 @@ import AudioComponent from "./components/Audio";
 function App() {
   const [activeTab, setActiveTab] = useState("email"); // Default to email tab
 
+  // For debugging
+  console.log("App rendering, activeTab:", activeTab);
+
   return (
     <div className="app-container">
       <header>
-        <h1>AI Assistant Dashboard</h1>
+        <h1>Dashboard</h1>
         <nav>
           <button
             className={activeTab === "email" ? "active" : ""}
@@ -27,6 +30,11 @@ function App() {
       </header>
 
       <main>
+        {/* Debugging message */}
+        <div style={{ marginBottom: "10px", color: "blue" }}>
+          Active Tab: {activeTab}
+        </div>
+
         {activeTab === "email" ? <EmailComponent /> : <AudioComponent />}
       </main>
 
