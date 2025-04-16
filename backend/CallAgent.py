@@ -31,7 +31,7 @@ from livekit.plugins import (
 
 
 # load environment variables, this is optional, only used for local development
-load_dotenv(dotenv_path=".env.local")
+load_dotenv(dotenv_path=".env")
 logger = logging.getLogger("outbound-caller")
 logger.setLevel(logging.INFO)
 
