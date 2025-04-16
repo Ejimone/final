@@ -1,0 +1,1 @@
+// this is the Audio component, it will be an animation that plays sound effects and visualizes audio waves for better user experience, as the user speaks. It will also handle user interactions and provide feedback based on audio input.

@@ -14,8 +14,7 @@ from SendEmail import AIService as EmailService, sendEmail
 from datetime import datetime
 import uuid
 import json
-from Weather import WeatherService, WeatherServiceError
-from Rag import RAGProcessor
+
 # Initialize logging
 from exceptions import EmailServiceError
 from Config import Config
@@ -245,10 +244,10 @@ class AIAssistant:
             self.email_service = _email_service
             
             # Initialize Weather Service
-            self.weather_service = WeatherService()
+            
             
             # Initialize RAG Processor
-            self.rag_processor = RAGProcessor()
+            
             
             return {
                 "status": "success",

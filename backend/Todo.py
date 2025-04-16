@@ -13,9 +13,7 @@ from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
 import pytz
 from SendEmail import AIService
-from Weather import WeatherService
-from WebScrapeAndProcess import scrape_webpages_with_serpapi, summarize_content
-from RealTimeSearch import real_time_search
+
 from Ai import initialize_llm
 from tenacity import retry, stop_after_attempt, wait_exponential
 
@@ -83,7 +81,6 @@ class TodoManager:
     def _initialize_services(self) -> None:
         """Initialize all required services"""
         self.ai_service = AIService()  # This already has retry logic built in
-        self.weather_service = WeatherService()
         self._setup_google_calendar()
     
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
@@ -419,23 +416,7 @@ class TodoManager:
             logger.error(f"Failed to get weather data: {e}")
             return None
 
-    async def get_related_info(self, todo: TodoItem) -> Optional[Dict[str, Any]]:
-        """Get related real-time information for a todo item"""
-        try:
-            # Use WebScrapeAndProcess to get relevant information
-            search_query = f"{todo.title} {' '.join(todo.tags)}"
-            search_results = await scrape_webpages_with_serpapi(search_query)
-            
-            if search_results.get("status") == "success":
-                # Summarize the results
-                gemini_model = initialize_llm()
-                summary = await summarize_content(str(search_results.get("data")), gemini_model)
-                return {"summary": summary.replace('#', ''), "source": search_results}
-                
-            return None
-        except Exception as e:
-            logger.error(f"Failed to get related information: {e}")
-            return None
+    
 
 async def main():
     """Main function for testing the TodoManager"""
