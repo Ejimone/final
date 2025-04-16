@@ -131,17 +131,6 @@ async def process_user_prompt(prompt: str, session_id: str = "default") -> Dict[
                 )
                 response["data"] = "Email sent successfully" if email_result else "Failed to send email"
                 
-        elif intent == "weather":
-            if "location" in details:
-                location = details["location"]
-                # Instantiate WeatherService locally for a fresh session
-                service = WeatherService()
-                try:
-                    weather_data = await service.get_weather(location)
-                    response["data"] = weather_data
-                    response["source"] = "weather_service"
-                finally:
-                    await service.close()
                     
         elif intent == "todo":
             action = details.get("action")
