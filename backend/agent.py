@@ -224,7 +224,7 @@ async def process_user_prompt(prompt: str, session_id: str = "default") -> Dict[
                 response["data"] = f"Unsupported todo action: {action}"
                 response["status"] = "error"
                 
-        elif intent in ["web_search", "real_time", "factual"]:
+        
             query = details.get("query", prompt)
             
             # First try real-time search
